@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Login - AmbuSense</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #2c3e50; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #34495e; padding: 40px; border-radius: 10px; width: 350px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 5px; border: none; font-size: 16px; text-align: center;}
+        button { background: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.3s; }
+        button:hover { background: #2980b9; }
+        #otpSection { display: none; margin-top: 20px; border-top: 1px solid #7f8c8d; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2 style="color: #3498db;">🚗 User Login</h2>
+        <p style="color: #bdc3c7;">Enter mobile number to receive OTP</p>
+        
+        <input type="number" id="mobile" placeholder="Mobile Number" />
+        <button id="sendOtpBtn" onclick="sendOTP()">Send OTP</button>
+        
+        <div id="otpSection">
+            <p style="color: #2ecc71; font-weight: bold;">OTP Sent Successfully! (Demo OTP: 1234)</p>
+            <input type="number" id="otp" placeholder="Enter 4-digit OTP" />
+            <button onclick="verifyOTP()">Verify & Login</button>
+        </div>
+    </div>
+
+    <script>
+        function sendOTP() {
+            var mob = document.getElementById('mobile').value;
+            if(mob.length < 5) { alert("Please enter a valid mobile number!"); return; }
+            document.getElementById('sendOtpBtn').style.display = 'none';
+            document.getElementById('otpSection').style.display = 'block';
+        }
+
+        function verifyOTP() {
+            var otp = document.getElementById('otp').value;
+            if(otp === "1234") {
+                window.location.href = "/user"; // Success redirect
+            } else {
+                alert("Invalid OTP! Try using 1234.");
+            }
+        }
+    </script>
+</body>
+</html>

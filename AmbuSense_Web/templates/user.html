@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User - AmbuSense</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        #map { height: 100vh; width: 100vw; z-index: 1;}
+        #panel { 
+            position: absolute; top: 20px; right: 20px; z-index: 1000; 
+            background: white; padding: 20px; border-radius: 12px; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3); width: 280px; text-align: center; 
+        }
+        .alert-box { 
+            background: #e74c3c; color: white; display: none; padding: 15px; 
+            border-radius: 8px; margin-top: 15px; font-weight: bold; font-size: 18px;
+            animation: blinker 1s linear infinite; box-shadow: 0 0 15px red;
+        }
+        @keyframes blinker { 50% { opacity: 0.5; } }
+        .enable-audio { background: #f39c12; color: white; border: none; padding: 10px; width: 100%; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px;}
+        .mute-btn { background: #95a5a6; color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px; display: none; }
+        .mute-btn:hover { background: #7f8c8d; }
+        .user-icon { font-size: 30px; }
+        .ambu-icon { font-size: 40px; transition: all 0.5s; }
+    </style>
+</head>
+<body>
+    <div id="panel">
+        <h2 style="color:#3498db; margin-top:0;">🚗 Your Map</h2>
+        <h3 id="distText" style="color: #2c3e50;">Distance: Scanning...</h3>
+        <div id="alertBox" class="alert-box">🚨 EV WITHIN 1.5 KM! PULL OVER! 🚨</div>
+        <button id="enableAudio" class="enable-audio">🔊 Enable Audio Alert System</button>
+        <!-- Mute Button so user isn't irritated -->
+        <button id="muteBtn" class="mute-btn">🔕 Dismiss & Stop Alarm</button>
+    </div>
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([13.0850, 80.2750], 14); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        var userPos = [13.0850, 80.2750]; // default
+        var userMarker = L.marker(userPos, {icon: L.divIcon({html: '🚗', className: 'user-icon', iconSize: [30, 30]})}).addTo(map);
+        var circle = L.circle(userPos, { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.05, radius: 1500, dashArray: '5, 5' }).addTo(map);
+        
+        // Ask Permission for Real Location
+        if(navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                userPos = [position.coords.latitude, position.coords.longitude];
+                map.setView(userPos, 15);
+                userMarker.setLatLng(userPos);
+                circle.setLatLng(userPos);
+                alert("App Permission: Location accurate!");
+            }, function() {
+                alert("Location permission skipped. Using default.");
+            });
+        }
+
+        var ambuMarker = L.marker([0, 0], {icon: L.divIcon({html: '🚑', className: 'ambu-icon', iconSize: [40, 40]})}).addTo(map);
+        ambuMarker.setOpacity(0);
+
+        // Audio System
+        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var oscillator = null;
+        var sirenInterval = null;
+        var audioEnabled = false;
+        var isAlerting = false;
+        var userMuted = false;
+
+        document.getElementById('enableAudio').onclick = function() {
+            audioCtx.resume();
+            audioEnabled = true;
+            this.style.display = "none";
+        };
+
+        document.getElementById('muteBtn').onclick = function() {
+            userMuted = true; // Permanently mutes it for this session to prevent irritation
+            stopSiren();
+            document.getElementById('alertBox').style.display = 'none';
+            this.style.display = 'none';
+        };
+
+        function playSiren() {
+            if (!audioEnabled || isAlerting || userMuted) return; // respect mute rules
+            isAlerting = true;
+            document.getElementById('alertBox').style.display = 'block';
+            document.getElementById('muteBtn').style.display = 'block';
+            
+            var high = true;
+            sirenInterval = setInterval(() => {
+                if(userMuted) return; 
+                if (oscillator) oscillator.stop();
+                oscillator = audioCtx.createOscillator();
+                var gainNode = audioCtx.createGain();
+                oscillator.type = 'square';
+                oscillator.frequency.value = high ? 900 : 700;
+                high = !high;
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime); 
+                oscillator.start();
+            }, 500);
+        }
+
+        function stopSiren() {
+            if (!isAlerting) return;
+            isAlerting = false;
+            if(!userMuted) document.getElementById('alertBox').style.display = 'none';
+            document.getElementById('muteBtn').style.display = 'none';
+            clearInterval(sirenInterval);
+            if (oscillator) {
+                oscillator.stop();
+                oscillator = null;
+            }
+        }
+
+        function getDistanceKm(lat1, lon1, lat2, lon2) {
+          var R = 6371; 
+          var dLat = (lat2-lat1) * (Math.PI/180);
+          var dLon = (lon2-lon1) * (Math.PI/180); 
+          var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        }
+
+        function getDistanceToSegmentKm(x0, y0, x1, y1, x2, y2) {
+            var L2 = Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2);
+            if (L2 == 0) return getDistanceKm(x0, y0, x1, y1);
+            var t = Math.max(0, Math.min(1, ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / L2));
+            var projX = x1 + t * (x2 - x1);
+            var projY = y1 + t * (y2 - y1);
+            return getDistanceKm(x0, y0, projX, projY);
+        }
+
+        setInterval(() => {
+            fetch('/api/get_location').then(res => res.json()).then(data => {
+                if (data.active) {
+                    ambuMarker.setOpacity(1);
+                    ambuMarker.setLatLng([data.lat, data.lng]);
+                    
+                    var distAmbu = getDistanceKm(userPos[0], userPos[1], data.lat, data.lng);
+                    var distRoute = distAmbu; // default if no destination
+                    
+                    if (data.route_path && data.route_path.length > 1) {
+                        var minDist = 9999;
+                        for(var i=0; i < data.route_path.length - 1; i++) {
+                            var p1 = data.route_path[i];
+                            var p2 = data.route_path[i+1];
+                            var d = getDistanceToSegmentKm(userPos[0], userPos[1], p1[0], p1[1], p2[0], p2[1]);
+                            if(d < minDist) minDist = d;
+                        }
+                        distRoute = minDist;
+                    } else if(data.dest_lat && data.dest_lng) {
+                        distRoute = getDistanceToSegmentKm(userPos[0], userPos[1], data.lat, data.lng, data.dest_lat, data.dest_lng);
+                    }
+                    
+                    // Advanced Logic: User must be <1.5KM from ambulance AND <200 meters (0.2km) from the specific Route line.
+                    if (distAmbu <= 1.5 && distRoute <= 0.2) { 
+                        playSiren();
+                        document.getElementById('distText').innerText = "Distance: " + distAmbu.toFixed(2) + " km (ON ROUTE 🚨)";
+                        circle.setStyle({fillOpacity: 0.3, color: '#c0392b'});
+                    } else {
+                        stopSiren();
+                        if (distAmbu <= 1.5) {
+                            document.getElementById('distText').innerText = "Distance: " + distAmbu.toFixed(2) + " km (SAFE: Off Route 🟢)";
+                        } else {
+                            document.getElementById('distText').innerText = "Distance: " + distAmbu.toFixed(2) + " km";
+                        }
+                        circle.setStyle({fillOpacity: 0.05, color: '#e74c3c'});
+                    }
+                } else {
+                    ambuMarker.setOpacity(0);
+                    document.getElementById('distText').innerText = "Distance: No active EV";
+                    stopSiren();
+                }
+            }).catch(e => {});
+        }, 1000);
+    </script>
+    <button onclick="localStorage.removeItem('ambusense_role'); window.location.href='/';" style="position:fixed; bottom:20px; right:20px; z-index:9999; background:#34495e; color:white; padding:10px 20px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">🚪 Logout Session</button>
+    <script>
+        // Set persistent login
+        localStorage.setItem("ambusense_role", "user");
+    </script>
+</body>
+</html>

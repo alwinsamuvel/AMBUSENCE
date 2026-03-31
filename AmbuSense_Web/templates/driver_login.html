@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Driver Registration - AmbuSense</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #2c3e50; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .box { background: #34495e; padding: 30px; border-radius: 10px; width: 450px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        h2 { text-align: center; color: #e74c3c; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 14px; color: #bdc3c7; margin-bottom: 5px; }
+        input[type="text"] { width: 95%; padding: 10px; border-radius: 5px; border: none; }
+        input[type="file"] { width: 95%; padding: 5px; color: white; background: #2c3e50; border-radius: 5px; }
+        .note { font-size: 11px; color: #f39c12; }
+        button { background: #27ae60; color: white; padding: 12px; border: none; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 15px; }
+        button:hover { background: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>🚑 Ambulance Driver Registration</h2>
+        <p style="text-align: center; color: #bdc3c7; font-size: 13px;">Details will be emailed to alwinsamuvel197@gmail.com</p>
+        
+        <form action="/register_driver" method="POST" enctype="multipart/form-data">
+            <div class="input-group">
+                <label>Full Name</label>
+                <input type="text" name="name" required placeholder="John Doe" />
+            </div>
+            
+            <div class="input-group">
+                <label>Mobile Number</label>
+                <input type="text" name="mobile" required placeholder="+91 XXXXXXXXXX" />
+            </div>
+            
+            <div class="input-group">
+                <label>Driving License Upload</label>
+                <span class="note">Min 2MB format support: PDF, JPG, JPEG</span>
+                <input type="file" name="dl_image" accept=".pdf, .jpg, .jpeg" required />
+            </div>
+            
+            <div class="input-group">
+                <label>Hospital ID Number</label>
+                <input type="text" name="hospital_id" required placeholder="HOSP-XYZ-123" />
+            </div>
+            
+            <div class="input-group">
+                <label>Hospital ID Proof Image Upload</label>
+                <span class="note">Support: PDF, JPG, JPEG</span>
+                <input type="file" name="hospital_proof" accept=".pdf, .jpg, .jpeg" required />
+            </div>
+            
+            <button type="submit">Submit Details & Login</button>
+        </form>
+    </div>
+</body>
+</html>

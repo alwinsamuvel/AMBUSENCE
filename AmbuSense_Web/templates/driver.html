@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Driver - AmbuSense</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        #map { height: 100vh; width: 100vw; z-index: 1;}
+        #panel { 
+            position: absolute; top: 20px; left: 50px; z-index: 1000; 
+            background: white; padding: 20px; border-radius: 12px; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3); width: 300px;
+        }
+        h2 { margin-top: 0; color: #e74c3c; }
+        .btn { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .btn:hover { background: #2ecc71; }
+        .ambu-icon { font-size: 30px; text-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        .dest-icon { font-size: 30px; }
+        /* Hide leaflet routing panel since we don't need text directions */
+        .leaflet-routing-container { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="panel">
+        <h2>🚑 Driver Board</h2>
+        <p style="font-size: 14px;"><b>1. Real Location!</b> App detects your GPS.</p>
+        <p style="font-size: 14px;"><b>2. Destination:</b> Click map to autodetect shortest road route.</p>
+        <p style="font-size: 14px;"><b>3. Active:</b> Drag ambulance to emulate driving.</p>
+        <button id="toggleBtn" class="btn">Start Emergency Siren</button>
+    </div>
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script>
+        var map = L.map('map').setView([13.0827, 80.2507], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        var ambuIcon = L.divIcon({html: '🚑', className: 'ambu-icon', iconSize: [40, 40], iconAnchor: [20, 20]});
+        var marker = L.marker([13.0827, 80.2507], {icon: ambuIcon, draggable: true}).addTo(map);
+        
+        var active = false;
+        var destMarker = null;
+        var routingControl = null;
+        var routePathCoords = [];
+
+        // Geolocation
+        map.locate({setView: true, maxZoom: 15});
+        map.on('locationfound', function(e) {
+            marker.setLatLng(e.latlng);
+            alert("Location Acquired! Ready to set destination.");
+            updateServer();
+        });
+
+        // Set Road Destination logic
+        map.on('click', function(e) {
+            if(!destMarker) {
+                destMarker = L.marker(e.latlng, {icon: L.divIcon({html: '🏥', className: 'dest-icon', iconSize: [30, 30]})}).addTo(map);
+                
+                // Real Shortest-Path Road Routing integration!
+                routingControl = L.Routing.control({
+                    waypoints: [ marker.getLatLng(), destMarker.getLatLng() ],
+                    routeWhileDragging: false,
+                    show: false, // hidden CSS anyway
+                    addWaypoints: false,
+                    lineOptions: { styles: [{color: 'red', opacity: 0.8, weight: 6}] }
+                }).on('routesfound', function(e) {
+                    var routes = e.routes;
+                    routePathCoords = routes[0].coordinates.map(c => [c.lat, c.lng]);
+                    updateServer(true); // broadcast physical route exactly once when generated
+                    alert("Shortest physical road route generated! Alerting users strictly on this path.");
+                }).addTo(map);
+                
+            } else {
+                marker.setLatLng(e.latlng);
+                if(routingControl) {
+                    routingControl.spliceWaypoints(0, 1, marker.getLatLng());
+                }
+                updateServer();
+            }
+        });
+
+        marker.on('dragend', function(e) {
+            if(routingControl) {
+                routingControl.spliceWaypoints(0, 1, marker.getLatLng());
+            }
+            updateServer(); 
+        });
+
+        document.getElementById('toggleBtn').onclick = function() {
+            active = !active;
+            this.innerText = active ? "Stop Emergency Mode" : "Start Emergency Siren";
+            this.style.background = active ? "#e74c3c" : "#27ae60";
+            updateServer();
+        };
+
+        function updateServer(sendRoute=false) {
+            var pos = marker.getLatLng();
+            var dLat = destMarker ? destMarker.getLatLng().lat : null;
+            var dLng = destMarker ? destMarker.getLatLng().lng : null;
+            
+            var payload = { lat: pos.lat, lng: pos.lng, active: active, dest_lat: dLat, dest_lng: dLng };
+            if (sendRoute && routePathCoords.length > 0) {
+                payload.route_path = routePathCoords;
+            }
+            
+            fetch('/api/update_location', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            }).catch(e => console.log("Network error"));
+        }
+        
+        setInterval(updateServer, 1000);
+    </script>
+    <button onclick="localStorage.removeItem('ambusense_role'); window.location.href='/';" style="position:fixed; bottom:20px; right:20px; z-index:9999; background:#e74c3c; color:white; padding:10px 20px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">🚪 Logout System</button>
+    <script>
+        localStorage.setItem("ambusense_role", "driver");
+    </script>
+</body>
+</html>
